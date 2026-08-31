@@ -61,9 +61,31 @@ void Clock_Set (void)
     Minute_LED = Time.min / 5;
     Second_LED = Time.sec / 5;
     Clock_String->Solid (Addressable_LED :: Black);
-    Clock_String->Set_One (Addressable_LED :: Red, Hour_LED);
-    Clock_String->Set_One (Addressable_LED :: Green, Minute_LED);
-    Clock_String->Set_One (Addressable_LED :: Blue, Second_LED);
+    if ((Hour_LED == Minute_LED) && (Hour_LED == Second_LED))
+    { // hour, minute and second all coincide
+        Clock_String->Set_One (Addressable_LED :: White, Hour_LED);
+    }
+    else if (Hour_LED == Minute_LED)
+    { // hour and minute coincide
+        Clock_String->Set_One (Addressable_LED :: Yellow, Hour_LED);
+        Clock_String->Set_One (Addressable_LED :: Blue, Second_LED);
+    }
+    else if (Hour_LED == Second_LED)
+    { // hour and second coincide
+        Clock_String->Set_One (Addressable_LED :: Magenta, Hour_LED);
+        Clock_String->Set_One (Addressable_LED :: Green, Minute_LED);
+    }
+    else if (Second_LED == Minute_LED)
+    { // minute and second coincide
+        Clock_String->Set_One (Addressable_LED :: Cyan, Second_LED);
+        Clock_String->Set_One (Addressable_LED :: Red, Hour_LED);
+    }
+    else
+    { // no collision
+        Clock_String->Set_One (Addressable_LED :: Red, Hour_LED);
+        Clock_String->Set_One (Addressable_LED :: Green, Minute_LED);
+        Clock_String->Set_One (Addressable_LED :: Blue, Second_LED);
+    } // LED collision handling
     // AM/PM indicator is LED 19
     if (Time.hour < 12)
     {
