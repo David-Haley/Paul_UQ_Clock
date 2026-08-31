@@ -49,3 +49,7 @@ cp build/paul_uq_clock.uf2 /media/$USER/RPI-RP2/
 ```
 
 The board will automatically reboot and run the new firmware.
+
+## License
+
+GPLv3 — see [LICENSE](LICENSE).
