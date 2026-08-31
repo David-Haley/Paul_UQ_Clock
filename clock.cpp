@@ -58,11 +58,20 @@ void Clock_Set (void)
 
     rtc_get_datetime(&Time);
     Hour_LED = Time.hour % Clock_Hours;
-    Minute_LED = Time.min % Clock_Hours;
-    Second_LED = Time.sec % Clock_Hours;
+    Minute_LED = Time.min / 5;
+    Second_LED = Time.sec / 5;
     Clock_String->Solid (Addressable_LED :: Black);
     Clock_String->Set_One (Addressable_LED :: Red, Hour_LED);
     Clock_String->Set_One (Addressable_LED :: Green, Minute_LED);
     Clock_String->Set_One (Addressable_LED :: Blue, Second_LED);
+    // AM/PM indicator is LED 19
+    if (Time.hour < 12)
+    {
+        Clock_String->Set_One (Addressable_LED :: Yellow, Clock_Count - 1);
+    }
+    else
+    {
+        Clock_String->Set_One (Addressable_LED :: Cyan, Clock_Count - 1);
+    } // Time.hour < 12
     Clock_String->Update ();
 } // Clock_Set
