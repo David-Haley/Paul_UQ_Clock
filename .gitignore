@@ -1,0 +1,35 @@
+# Build output
+build/
+cmake-build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# Pico SDK generated files
+pico-sdk/
+elf2uf2/
+pioasm/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Binaries
+*.o
+*.obj
+*.elf
+*.uf2
+*.bin
+*.hex
+*.map
+*.dis
