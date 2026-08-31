@@ -8,7 +8,7 @@
 
 #include "pico/stdlib.h"
 #include "clock.hpp"
-#include "/home/david/Christmas/LED_Driver/addressable_led.hpp"
+#include "addressable_led.hpp"
 
 const uint Clock_Count = 20; // number of LEDs in string
 const uint Clock_Colours = 6;
@@ -26,18 +26,18 @@ Addressable_LED *Clock_String;
 
 void Clock_Init (void)
 {
-    Clock_String (Clock_Count, pio0, 0, Addressable_LED :: J1);
-    Clock_String.Solid (Addressable_LED :: Black);
-    Clock_String.Update ();
+    Clock_String = new Addressable_LED (Clock_Count, pio0, 0, Addressable_LED :: J1);
+    Clock_String->Solid (Addressable_LED :: Black);
+    Clock_String->Update ();
 } // Clock_Init
 
 
 void Clock_Set (void)
 {
-    static unit L = 0;
-    Clock_String.Solid (Addressable_LED :: Black);
-    Clock_String.Set_One (Addressable_LED :: White, L);
-    Clock_String.Update ();
+    static uint L = 0;
+    Clock_String->Solid (Addressable_LED :: Black);
+    Clock_String->Set_One (Addressable_LED :: White, L);
+    Clock_String->Update ();
     if (L < Clock_Count)
     {
         L++;
@@ -46,4 +46,4 @@ void Clock_Set (void)
     {
         L = 0;
     } // (L < Clock_Count)
-} Clock_Set
+} // Clock_Set
