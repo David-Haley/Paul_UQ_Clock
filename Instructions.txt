@@ -1,5 +1,0 @@
-Build main.d
-Target hardware is Raspberry Pi Pico W
-Uses Free RTOS
-Uses adresseableleds class source directory /home/david/Pico_Projects/LED_Driver requires the state machine assembler from the pi pico sdk
-Build artifacts should be located in ./build

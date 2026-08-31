@@ -2,13 +2,17 @@
 // Note this has been built for the PI Pico W
 // Author    : David Haley
 // Created   : 26/11/2022
-// Last Edit : 31/09/2025
+// Last Edit : 01/09/2026
+
+// 20250901 : Start of implementation as a clock.
 // 20231105: Setting to black moved to start of cycle so that the LED data is
 // not overwritten before the DMA process has completed. 
 
 #include "pico/stdlib.h"
 #include "clock.hpp"
 #include "addressable_led.hpp"
+#include "hardware/rtc.h"
+#include "pico/util/datetime.h"
 
 const uint Clock_Count = 20; // number of LEDs in string
 const uint Clock_Colours = 6;
@@ -24,26 +28,41 @@ const uint32_t Colour_Table [Clock_Colours] =
 
 Addressable_LED *Clock_String;
 
+const uint Clock_Hours = 12; // number of LEDs used to represent time
+
 void Clock_Init (void)
 {
-    Clock_String = new Addressable_LED (Clock_Count, pio0, 0, Addressable_LED :: J1);
+    // Start on Tuesday of 01/09/2026 at 00:00:00
+    datetime_t Time = {
+        .year = 2026,
+        .month = 9,
+        .day = 1,
+        .dotw = 2, // 0 is Sunday, so 2 is Tuesday
+        .hour = 0,
+        .min = 0,
+        .sec = 0
+    };
+    rtc_init();
+    rtc_set_datetime(&Time);
+    sleep_us (64); // delay is required because of slow rtc hardware
+    Clock_String =
+      new Addressable_LED (Clock_Count, pio0, 0, Addressable_LED :: J1);
     Clock_String->Solid (Addressable_LED :: Black);
-    Clock_String->Update ();
 } // Clock_Init
 
 
 void Clock_Set (void)
 {
-    static uint L = 0;
+    uint Hour_LED, Minute_LED, Second_LED;
+    datetime_t Time;
+
+    rtc_get_datetime(&Time);
+    Hour_LED = Time.hour % Clock_Hours;
+    Minute_LED = Time.min % Clock_Hours;
+    Second_LED = Time.sec % Clock_Hours;
     Clock_String->Solid (Addressable_LED :: Black);
-    Clock_String->Set_One (Addressable_LED :: White, L);
+    Clock_String->Set_One (Addressable_LED :: Red, Hour_LED);
+    Clock_String->Set_One (Addressable_LED :: Green, Minute_LED);
+    Clock_String->Set_One (Addressable_LED :: Blue, Second_LED);
     Clock_String->Update ();
-    if (L < Clock_Count)
-    {
-        L++;
-    }
-    else
-    {
-        L = 0;
-    } // (L < Clock_Count)
 } // Clock_Set
