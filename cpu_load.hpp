@@ -18,12 +18,6 @@ void CPU_Load_Init (void);
 // definition in FreeRTOSConfig.h).
 void CPU_Load_Task_Switched_In (void);
 
-// Debugging: prints how many times each task was switched in (while the CPU
-// was not idle) since the last call, then resets the counts. Call periodically
-// from a task, to see what's actually keeping the CPU busy.
-// TODO remove once the observed GP7 duty cycle is explained.
-void CPU_Load_Report (void);
-
 #ifdef __cplusplus
 }
 #endif

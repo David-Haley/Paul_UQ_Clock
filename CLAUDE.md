@@ -64,11 +64,9 @@ cp build/paul_uq_clock.uf2 /media/$USER/RPI-RP2/
   Implemented via the `traceTASK_SWITCHED_IN` FreeRTOS trace hook (wired up in
   `FreeRTOSConfig.h`, which `#include`s `cpu_load.hpp` for this), which fires on
   every context switch — an idle hook alone can't detect the CPU *leaving* idle,
-  only that it's currently in it. `CPU_Load_Report()` (called from
-  `heartbeat_task`) tallies which tasks are actually being switched in while
-  non-idle, by name — added to debug an unexpectedly busy-looking GP7 trace, which
-  turned out to be the SMP idle-task bug described below, not real load; harmless
-  to keep or remove.
+  only that it's currently in it. Confirmed on hardware: GP7 reads high most of
+  the time with occasional short low blips, consistent with this firmware's
+  actual (light) workload.
 - `clock.hpp` / `clock.cpp` — all clock/display logic, exposed as a plain C API
   (`Clock_Init`, `Clock_Set`) so it can be called from `main.c`. Internally uses the
   `Addressable_LED` C++ class. Also owns `RTC_Mutex`, a FreeRTOS mutex shared with
