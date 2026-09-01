@@ -16,6 +16,7 @@
 #include "task.h"
 #include "clock.hpp"
 #include "ntp.hpp"
+#include "cpu_load.hpp"
 #include "hardware/rtc.h"
 #include "pico/util/datetime.h"
 
@@ -46,12 +47,16 @@ static void heartbeat_task(__unused void *params) {
         xSemaphoreGive(RTC_Mutex);
         printf("%04d-%02d-%02d %02d:%02d:%02d\n", Time.year, Time.month,
           Time.day, Time.hour, Time.min, Time.sec);
+        // Debugging: what's causing the observed GP7 duty cycle.
+        // TODO remove once explained.
+        CPU_Load_Report();
         vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_DELAY_MS));
     }
 }
 
 int main(void) {
     stdio_init_all();
+    CPU_Load_Init();
 
     xTaskCreate(led_task, "led", configMINIMAL_STACK_SIZE, NULL, LED_TASK_PRIORITY, NULL);
     xTaskCreate(heartbeat_task, "heartbeat", configMINIMAL_STACK_SIZE, NULL, HEARTBEAT_TASK_PRIORITY, NULL);

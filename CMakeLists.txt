@@ -18,7 +18,8 @@ target_sources(paul_uq_clock PRIVATE
     main.c
     clock.cpp
     wifi.cpp
-    ntp.cpp)
+    ntp.cpp
+    cpu_load.cpp)
 
 target_include_directories(paul_uq_clock PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}

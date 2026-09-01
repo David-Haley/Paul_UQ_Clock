@@ -2,17 +2,21 @@
 #define FREERTOS_CONFIG_H
 
 #include <stdint.h>
+#include "cpu_load.hpp"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Core / scheduling ------------------------------------------------------ */
-#define configNUMBER_OF_CORES                   2
-#define configUSE_CORE_AFFINITY                  1
-// lwIP (via pico_cyw43_arch_lwip_sys_freertos) is pinned explicitly to core 1;
-// every other task defaults to core 0.
-#define configTASK_DEFAULT_CORE_AFFINITY        ( 1 << 0 )
+// Single core: SMP (configNUMBER_OF_CORES=2) was tried so lwIP/cyw43 could be
+// dedicated to core 1 per the project spec, but pinning them there hung (see
+// CLAUDE.md), and leaving every task on a shared default core-0 affinity also
+// confined FreeRTOS's own core-1 idle task to core 0 — it then round-robinned
+// against core 0's idle task every tick, a bug, not real CPU load. Nothing
+// currently has a reason to run on core 1, so plain single-core avoids both
+// problems.
+#define configNUMBER_OF_CORES                   1
 #define configUSE_PREEMPTION                    1
 #define configUSE_TIME_SLICING                  1
 #define configUSE_TICKLESS_IDLE                 0
@@ -39,7 +43,6 @@ extern "C" {
 
 /* Hooks --------------------------------------------------------------------*/
 #define configUSE_IDLE_HOOK                     0
-#define configUSE_PASSIVE_IDLE_HOOK             0
 #define configUSE_TICK_HOOK                     0
 #define configUSE_MALLOC_FAILED_HOOK            1
 #define configCHECK_FOR_STACK_OVERFLOW          2
@@ -78,6 +81,9 @@ extern "C" {
 /* Cortex-M0+ / interrupt priority (not used on RP2040 NVIC directly but
  * kept for portability if config asserts require it) */
 #define configPRIO_BITS                         2
+
+/* GP7 CPU-load probe (cpu_load.hpp/.cpp) -------------------------------------*/
+#define traceTASK_SWITCHED_IN()                 CPU_Load_Task_Switched_In ()
 
 #ifdef __cplusplus
 }

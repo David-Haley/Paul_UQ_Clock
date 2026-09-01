@@ -6,10 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Firmware for a Raspberry Pi Pico W that drives a 20-LED addressable (WS2812-style)
 ring as a 12-position analog-style clock. LEDs 0-11 form the clock face; LED 19 is
-an AM/PM indicator. Runs on FreeRTOS (SMP, both RP2040 cores) with three tasks:
-`led_task` (updates the display every second from the RP2040's onboard RTC),
-`heartbeat_task` (prints a heartbeat over USB stdio), and the NTP task (connects to
-Wi-Fi, sets the RTC from NTP, and resyncs hourly — see Architecture below).
+an AM/PM indicator. Runs on single-core FreeRTOS with three tasks: `led_task`
+(updates the display every second from the RP2040's onboard RTC), `heartbeat_task`
+(prints the RTC's date/time over USB stdio once a second), and the NTP task
+(connects to Wi-Fi, sets the RTC from NTP, and resyncs hourly — see Architecture
+below).
 
 ## Build
 
@@ -56,12 +57,24 @@ cp build/paul_uq_clock.uf2 /media/$USER/RPI-RP2/
   `tskIDLE_PRIORITY + 2`), `heartbeat_task` (priority `tskIDLE_PRIORITY + 1`), and
   starts the NTP task via `NTP_Start()`, then starts the scheduler. `led_task` calls
   `Clock_Init()` once and `Clock_Set()` every `LED_DELAY_MS` (1000ms).
+  `heartbeat_task` prints the RTC's current date/time (under `RTC_Mutex`) once a
+  second, rather than a plain counter.
+- `cpu_load.hpp` / `cpu_load.cpp` — drives GP7 high while the idle task is running
+  and low otherwise, so CPU load can be watched on a scope/logic analyser.
+  Implemented via the `traceTASK_SWITCHED_IN` FreeRTOS trace hook (wired up in
+  `FreeRTOSConfig.h`, which `#include`s `cpu_load.hpp` for this), which fires on
+  every context switch — an idle hook alone can't detect the CPU *leaving* idle,
+  only that it's currently in it. `CPU_Load_Report()` (called from
+  `heartbeat_task`) tallies which tasks are actually being switched in while
+  non-idle, by name — added to debug an unexpectedly busy-looking GP7 trace, which
+  turned out to be the SMP idle-task bug described below, not real load; harmless
+  to keep or remove.
 - `clock.hpp` / `clock.cpp` — all clock/display logic, exposed as a plain C API
   (`Clock_Init`, `Clock_Set`) so it can be called from `main.c`. Internally uses the
   `Addressable_LED` C++ class. Also owns `RTC_Mutex`, a FreeRTOS mutex shared with
   `ntp.cpp` that guards every RTC hardware access — `rtc_set_datetime()` briefly
-  leaves the RTC in a transitional state, and once NTP resync added a second,
-  cross-core writer of the RTC, `Clock_Set`'s reads needed to not race that.
+  leaves the RTC in a transitional state, and once NTP resync added a second task
+  that writes the RTC, `Clock_Set`'s reads needed to not race that.
   - `Clock_Init` seeds the RTC with a placeholder datetime (so `Clock_Set` always has
     something valid to read) and constructs the `Addressable_LED` driver on `pio0`,
     connector `J1`. The placeholder is overwritten by the NTP task's first sync.
@@ -99,19 +112,29 @@ cp build/paul_uq_clock.uf2 /media/$USER/RPI-RP2/
 - `lwipopts.h` — lwIP configuration for `NO_SYS=0` (full FreeRTOS integration via
   `pico_cyw43_arch_lwip_sys_freertos`), giving blocking sockets and automatic
   servicing of the cyw43 driver/lwIP stack from their own FreeRTOS task.
-- FreeRTOS config (`FreeRTOSConfig.h`): SMP across both cores
-  (`configNUMBER_OF_CORES=2`), with `configTASK_DEFAULT_CORE_AFFINITY` pinning every
-  task to core 0 by default. Preemptive with time slicing, 1kHz tick, dynamic heap
-  only (128KB), stack-overflow checking enabled.
-- Instructions.txt (project spec, not checked in — see `.gitignore`) asks for lwIP
-  dedicated to core 1. That's **not currently done**: `cyw43_arch_init()` hung
-  indefinitely when the cyw43 driver's async_context worker task was pinned to core
-  1 (via `async_context_freertos_config_t.task_core_id`) on this SDK/FreeRTOS-Kernel
-  combination, and separately, lwIP's own `tcpip_thread` (created internally by
-  `tcpip_init()` inside `lwip_freertos_init()`, via a plain `xTaskCreate()` in
-  lwIP's `contrib/ports/freertos/sys_arch.c`) isn't reachable to pin at all without
-  either patching lwIP or fetching its handle by name
-  (`xTaskGetHandle("tcpip_thread")`) after `cyw43_arch_init()` returns and calling
-  `vTaskCoreAffinitySet()` on it directly. Everything — lwIP included — currently
-  runs with default affinity (core 0). Revisit only if asked; the working,
-  user-confirmed state should not be regressed to chase this without discussion.
+- FreeRTOS config (`FreeRTOSConfig.h`): single core
+  (`configNUMBER_OF_CORES=1`). Preemptive with time slicing, 1kHz tick, dynamic
+  heap only (128KB), stack-overflow checking enabled.
+- The project spec (formerly `Instructions.txt`, removed once implemented) asked
+  for dual-core operation with lwIP dedicated to core 1. That's **not implemented**,
+  and SMP was tried and abandoned, in two stages:
+  - Pinning the cyw43 driver's async_context worker task to core 1 (via
+    `async_context_freertos_config_t.task_core_id`) hung `cyw43_arch_init()`
+    indefinitely on this SDK/FreeRTOS-Kernel combination. It also wouldn't have
+    been sufficient anyway: lwIP's own `tcpip_thread` (created internally by
+    `tcpip_init()` inside `lwip_freertos_init()`, via a plain `xTaskCreate()` in
+    lwIP's `contrib/ports/freertos/sys_arch.c`) is a separate task, not reachable
+    to pin without either patching lwIP or fetching its handle by name
+    (`xTaskGetHandle("tcpip_thread")`) after `cyw43_arch_init()` returns and
+    calling `vTaskCoreAffinitySet()` on it directly.
+  - With that abandoned, `configNUMBER_OF_CORES=2` was kept briefly with
+    `configTASK_DEFAULT_CORE_AFFINITY` defaulting every task to core 0 — but
+    FreeRTOS creates its per-core idle tasks (`IDLE0`, `IDLE1`, ...) with plain
+    `xTaskCreate()` too, so `IDLE1` (meant for core 1) inherited that same
+    core-0-only default. Core 0 ended up round-robinning between `IDLE0` and
+    `IDLE1` every tick whenever otherwise idle — a real bug (and likely left core
+    1 unable to run anything, not even its own idle task), not genuine CPU load;
+    it showed up as a misleading ~500Hz/50%-duty GP7 trace (`cpu_load.cpp`'s
+    probe correctly treats "not `IDLE0`" as busy, so `IDLE1` masqueraded as work).
+  Single-core was reverted to rather than fixing the idle tasks' affinity, since
+  nothing currently has a reason to run on core 1. Revisit only if asked.

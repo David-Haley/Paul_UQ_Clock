@@ -36,3 +36,6 @@ pioasm/
 
 # Private (security issue)
 configuration.h
+
+# Serial capture logs
+*.log
