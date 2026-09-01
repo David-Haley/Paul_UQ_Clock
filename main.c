@@ -16,6 +16,8 @@
 #include "task.h"
 #include "clock.hpp"
 #include "ntp.hpp"
+#include "hardware/rtc.h"
+#include "pico/util/datetime.h"
 
 #define LED_TASK_PRIORITY       (tskIDLE_PRIORITY + 2)
 #define HEARTBEAT_TASK_PRIORITY (tskIDLE_PRIORITY + 1)
@@ -32,9 +34,18 @@ static void led_task(__unused void *params) {
 }
 
 static void heartbeat_task(__unused void *params) {
-    uint32_t beat = 0;
+    datetime_t Time;
+
+    // RTC_Mutex is created by Clock_Init (called from led_task). Safe without
+    // waiting for it here: led_task has higher priority and both tasks are
+    // core-0-only, so led_task always runs Clock_Init to completion before
+    // heartbeat_task gets any CPU time.
     while (true) {
-        printf("heartbeat %lu\n", (unsigned long) beat++);
+        xSemaphoreTake(RTC_Mutex, portMAX_DELAY);
+        rtc_get_datetime(&Time);
+        xSemaphoreGive(RTC_Mutex);
+        printf("%04d-%02d-%02d %02d:%02d:%02d\n", Time.year, Time.month,
+          Time.day, Time.hour, Time.min, Time.sec);
         vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_DELAY_MS));
     }
 }
