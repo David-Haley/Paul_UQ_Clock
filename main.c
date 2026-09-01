@@ -15,6 +15,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "clock.hpp"
+#include "ntp.hpp"
 
 #define LED_TASK_PRIORITY       (tskIDLE_PRIORITY + 2)
 #define HEARTBEAT_TASK_PRIORITY (tskIDLE_PRIORITY + 1)
@@ -43,6 +44,7 @@ int main(void) {
 
     xTaskCreate(led_task, "led", configMINIMAL_STACK_SIZE, NULL, LED_TASK_PRIORITY, NULL);
     xTaskCreate(heartbeat_task, "heartbeat", configMINIMAL_STACK_SIZE, NULL, HEARTBEAT_TASK_PRIORITY, NULL);
+    NTP_Start();
 
     vTaskStartScheduler();
 

@@ -30,18 +30,23 @@ Addressable_LED *Clock_String;
 
 const uint Clock_Hours = 12; // number of LEDs used to represent time
 
+SemaphoreHandle_t RTC_Mutex = NULL;
+
 void Clock_Init (void)
 {
-    // Start on Tuesday of 01/09/2026 at 00:00:00
+    // Placeholder start time so the RTC is running (and rtc_get_datetime in
+    // Clock_Set has something valid to read) before the first NTP sync (see
+    // ntp.cpp) overwrites it with real local time.
     datetime_t Time = {
         .year = 2026,
-        .month = 9,
+        .month = 1,
         .day = 1,
-        .dotw = 2, // 0 is Sunday, so 2 is Tuesday
+        .dotw = 4, // 0 is Sunday, so 4 is Thursday
         .hour = 0,
         .min = 0,
         .sec = 0
     };
+    RTC_Mutex = xSemaphoreCreateMutex ();
     rtc_init();
     rtc_set_datetime(&Time);
     sleep_us (64); // delay is required because of slow rtc hardware
@@ -56,7 +61,9 @@ void Clock_Set (void)
     uint Hour_LED, Minute_LED, Second_LED;
     datetime_t Time;
 
+    xSemaphoreTake (RTC_Mutex, portMAX_DELAY);
     rtc_get_datetime(&Time);
+    xSemaphoreGive (RTC_Mutex);
     Hour_LED = Time.hour % Clock_Hours;
     Minute_LED = Time.min / 5;
     Second_LED = Time.sec / 5;

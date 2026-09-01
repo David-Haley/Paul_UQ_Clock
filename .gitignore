@@ -33,3 +33,6 @@ pioasm/
 *.hex
 *.map
 *.dis
+
+# Private (security issue)
+configuration.h

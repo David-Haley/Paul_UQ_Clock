@@ -23,9 +23,24 @@ Each second, `Clock_Set` (in `clock.cpp`) reads the RP2040's onboard RTC and lig
 
 Since each LED can only show one colour at a time, collisions between markers are shown as a distinct blended colour rather than silently overwriting one another.
 
+## Time sync
+
+On boot, the board connects to Wi-Fi and sets its RTC from NTP (preferring an
+NTP server offered via DHCP, falling back to `pool.ntp.org`), then resyncs once an
+hour. This runs as its own FreeRTOS task.
+
 ## Building
 
 Requires the Raspberry Pi Pico SDK and FreeRTOS Kernel, with `PICO_SDK_PATH` and `FREERTOS_KERNEL_PATH` set in the environment (or picked up automatically if installed as siblings under `~/pico/`).
+
+You also need a `configuration.h` in the project root (not checked in — see
+`.gitignore`) defining:
+
+```c
+#define WiFi_SSID     "..."
+#define wiFi_Password "..."
+#define UTC_Offset    600  // minutes to add to UTC to get local time
+```
 
 ```bash
 ./Build.sh
@@ -38,7 +53,10 @@ cmake -S . -B ./build
 cmake --build ./build
 ```
 
-This produces `build/paul_uq_clock.uf2` (along with `.elf`, `.bin`, `.hex`).
+This produces `build/paul_uq_clock.uf2` (along with `.elf`, `.bin`, `.hex`). If CMake
+reports an "Incompatible picotool installation" error, reconfigure with
+`cmake -S . -B ./build -DPICOTOOL_FORCE_FETCH_FROM_GIT=1` so it builds a matching
+`picotool` instead of using the system one.
 
 ## Flashing
 

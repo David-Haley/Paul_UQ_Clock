@@ -16,16 +16,20 @@ add_executable(paul_uq_clock)
 
 target_sources(paul_uq_clock PRIVATE
     main.c
-    clock.cpp)
+    clock.cpp
+    wifi.cpp
+    ntp.cpp)
 
 target_include_directories(paul_uq_clock PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
     /home/david/Pico_Projects/LED_Driver)
 
 target_link_libraries(paul_uq_clock
     pico_stdlib
-    pico_cyw43_arch_none
+    pico_cyw43_arch_lwip_sys_freertos
     hardware_pio
     hardware_dma
+    hardware_rtc
     FreeRTOS-Kernel-Heap4
     /home/david/Pico_Projects/LED_Driver/build/libaddressable_led.a)
 

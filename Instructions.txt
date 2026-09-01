@@ -1,0 +1,7 @@
+Connect to wireless LAN, using SSID and password obtained from confihuration.h file. 
+Use NTP to obtain UTC.
+Initialise Pi Pico W real time clock to local time applying UTC_Offset (minutes) obtained from configuration.h.
+Update Pi Pico W real time clock from NTP once per hour (new RTOS task required).
+Use lwIP to provide IP stack and services
+Software to run using both cores, core 1 dedicated to lwIP, RTOS and everything else runs on core 0.
+Use NTP server obtained via DHCP if provided, alternatively use pool.ntp.org

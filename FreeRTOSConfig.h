@@ -8,7 +8,11 @@ extern "C" {
 #endif
 
 /* Core / scheduling ------------------------------------------------------ */
-#define configNUMBER_OF_CORES                   1
+#define configNUMBER_OF_CORES                   2
+#define configUSE_CORE_AFFINITY                  1
+// lwIP (via pico_cyw43_arch_lwip_sys_freertos) is pinned explicitly to core 1;
+// every other task defaults to core 0.
+#define configTASK_DEFAULT_CORE_AFFINITY        ( 1 << 0 )
 #define configUSE_PREEMPTION                    1
 #define configUSE_TIME_SLICING                  1
 #define configUSE_TICKLESS_IDLE                 0
@@ -35,6 +39,7 @@ extern "C" {
 
 /* Hooks --------------------------------------------------------------------*/
 #define configUSE_IDLE_HOOK                     0
+#define configUSE_PASSIVE_IDLE_HOOK             0
 #define configUSE_TICK_HOOK                     0
 #define configUSE_MALLOC_FAILED_HOOK            1
 #define configCHECK_FOR_STACK_OVERFLOW          2
