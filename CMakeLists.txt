@@ -19,6 +19,8 @@ target_sources(paul_uq_clock PRIVATE
     clock.cpp
     wifi.cpp
     ntp.cpp
+    aux_led.cpp
+    cJSON.c
     cpu_load.cpp)
 
 target_include_directories(paul_uq_clock PRIVATE
@@ -28,6 +30,7 @@ target_include_directories(paul_uq_clock PRIVATE
 target_link_libraries(paul_uq_clock
     pico_stdlib
     pico_cyw43_arch_lwip_sys_freertos
+    pico_lwip_mqtt
     hardware_pio
     hardware_dma
     hardware_rtc

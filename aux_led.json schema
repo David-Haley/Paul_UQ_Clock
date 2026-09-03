@@ -1,0 +1,39 @@
+{
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "title": "Auxillary LED",
+   "type": "object",
+   "properties" :
+   {
+      "aux_led" :
+      {
+         "type" : "array",
+         "description" : "Each element contains the command for one LED",
+         "items" :
+         {
+            "type" : "object",
+            "required": [ "led", "colour" ],
+            "properties" :
+            {
+               "led" :
+               {
+                  "description" : "led index, range 12 .. 18",
+                  "type" : "integer",
+                  "minimum" : 12,
+                  "maximum" : 18
+               },
+               "colour" :
+               {
+                  "description" : "The name of the colour index to light LED.",
+                  "enum" : ["red", "yellow", "green", "cyan", "blue", "magenta",
+                            "white", "black"]
+               },
+               "flash" :
+               {
+                  "description" : "Optional field, to flash the LED when true.",
+                  "type" : "boolean"
+               }
+            }
+         }
+      }
+   }
+}
