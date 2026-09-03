@@ -10,11 +10,20 @@
 
 #include "pico/cyw43_arch.h"
 #include "pico/async_context_freertos.h"
+#include "pico/time.h"
+
+#include "task.h"
 
 #include "wifi.hpp"
 #include "configuration.h"
 
-const uint32_t Connect_Timeout_Ms = 60000;
+const uint32_t Connect_Timeout_Ms = 60000; // per-attempt join timeout
+// Keep retrying (with backoff) for at least this long before giving up, since
+// a single join attempt can fail outright on transient AP/RF issues (seen on
+// hardware) despite the network being fine moments later.
+const uint32_t Connect_Retry_Budget_Ms = 120000;
+const uint32_t Connect_Backoff_Initial_Ms = 2000;
+const uint32_t Connect_Backoff_Max_Ms = 15000;
 
 const EventBits_t Wifi_Connected_Bit = 1 << 0;
 const EventBits_t Wifi_Failed_Bit = 1 << 1;
@@ -40,7 +49,7 @@ void WiFi_Init (void)
     Wifi_Event_Group = xEventGroupCreate ();
 } // WiFi_Init
 
-static bool Do_Connect (void)
+static bool Init_Driver (void)
 {
     async_context_freertos_config_t Config =
       async_context_freertos_default_config ();
@@ -58,15 +67,48 @@ static bool Do_Connect (void)
         return false;
     } // if
     cyw43_arch_enable_sta_mode ();
-    printf ("Wi-Fi: connecting...\n");
-    if (cyw43_arch_wifi_connect_timeout_ms (WiFi_SSID, wiFi_Password,
-        CYW43_AUTH_WPA2_AES_PSK, Connect_Timeout_Ms) != 0)
+    return true;
+} // Init_Driver
+
+static bool Do_Connect (void)
+{
+    if (!Init_Driver ())
     {
-        printf ("Wi-Fi: connection failed\n");
         return false;
     } // if
-    printf ("Wi-Fi: connected\n");
-    return true;
+
+    // A single join attempt can fail outright (transient AP/RF issue, seen on
+    // hardware) even though the network is fine moments later, so retry with
+    // backoff for at least Connect_Retry_Budget_Ms before giving up. The
+    // driver/async context above are only ever set up once, per this
+    // function's caller (WiFi_Connect's Started guard) — only the join itself
+    // is repeated.
+    absolute_time_t Deadline = make_timeout_time_ms (Connect_Retry_Budget_Ms);
+    uint32_t Backoff_Ms = Connect_Backoff_Initial_Ms;
+    uint Attempt = 0;
+
+    while (true)
+    {
+        Attempt++;
+        printf ("Wi-Fi: connecting (attempt %u)...\n", Attempt);
+        if (cyw43_arch_wifi_connect_timeout_ms (WiFi_SSID, wiFi_Password,
+            CYW43_AUTH_WPA2_AES_PSK, Connect_Timeout_Ms) == 0)
+        {
+            printf ("Wi-Fi: connected\n");
+            return true;
+        } // if
+        if (absolute_time_diff_us (get_absolute_time (), Deadline) <= 0)
+        {
+            printf ("Wi-Fi: connection failed after %u attempt(s), giving up\n",
+              Attempt);
+            return false;
+        } // if
+        printf ("Wi-Fi: connection failed, retrying in %lu ms\n",
+          (unsigned long) Backoff_Ms);
+        vTaskDelay (pdMS_TO_TICKS (Backoff_Ms));
+        Backoff_Ms = Backoff_Ms * 2 < Connect_Backoff_Max_Ms ?
+          Backoff_Ms * 2 : Connect_Backoff_Max_Ms;
+    } // while
 } // Do_Connect
 
 bool WiFi_Connect (void)

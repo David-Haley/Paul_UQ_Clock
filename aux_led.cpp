@@ -25,7 +25,14 @@
 #include "configuration.h"
 #include "cJSON.h"
 
-const uint32_t Retry_Period_Ms = 60000; // used after a connect/parse failure
+// Retry (DNS resolve failure, synchronous mqtt_client_connect failure, or a
+// non-accepted Connection_Cb status) backs off from Mqtt_Retry_Initial_Ms up
+// to Mqtt_Retry_Max_Ms, resetting to the initial delay once a connection is
+// actually accepted — so a transient failure (e.g. the ERR_RTE routing race
+// seen on hardware) recovers quickly, while a persistent one settles at the
+// slower steady-state rate instead of hammering the broker.
+const uint32_t Mqtt_Retry_Initial_Ms = 2000;
+const uint32_t Mqtt_Retry_Max_Ms = 60000;
 const uint32_t Wifi_Settle_Grace_Ms = 500;
 const uint32_t Aux_LED_Task_Stack_Words = 1536; // headroom for cJSON parsing
 const size_t Rx_Buffer_Size = 512; // comfortably fits 7 aux_led elements
@@ -49,6 +56,11 @@ static mqtt_client_t *Client = NULL;
 // Given by Connection_Cb whenever the connection is not (or is no longer)
 // established, so the task's connect loop knows when to retry.
 static SemaphoreHandle_t Disconnect_Semaphore = NULL;
+// Only ever touched by Connection_Cb (reset on success) and by Aux_LED_Task
+// while it isn't connected (grown after each failure) — the two never run
+// concurrently, since the task is always blocked on Disconnect_Semaphore
+// whenever a connection exists for Connection_Cb to later report lost.
+static uint32_t Backoff_Ms = Mqtt_Retry_Initial_Ms;
 
 static uint8_t Rx_Buffer [Rx_Buffer_Size];
 static size_t Rx_Length = 0;
@@ -184,6 +196,7 @@ static void Connection_Cb (mqtt_client_t *Mqtt_Client, void *Arg,
     if (Status == MQTT_CONNECT_ACCEPTED)
     {
         printf ("Aux LED: MQTT connected\n");
+        Backoff_Ms = Mqtt_Retry_Initial_Ms;
         cyw43_arch_lwip_begin ();
         mqtt_subscribe (Mqtt_Client, Topic, 0, Subscribe_Cb, NULL);
         cyw43_arch_lwip_end ();
@@ -194,6 +207,16 @@ static void Connection_Cb (mqtt_client_t *Mqtt_Client, void *Arg,
         xSemaphoreGive (Disconnect_Semaphore);
     } // if
 } // Connection_Cb
+
+// Waits the current backoff delay, then grows it for next time (capped).
+static void Retry_Backoff (void)
+{
+    printf ("Aux LED: retrying MQTT connection in %lu ms\n",
+      (unsigned long) Backoff_Ms);
+    vTaskDelay (pdMS_TO_TICKS (Backoff_Ms));
+    Backoff_Ms = Backoff_Ms * 2 < Mqtt_Retry_Max_Ms ?
+      Backoff_Ms * 2 : Mqtt_Retry_Max_Ms;
+} // Retry_Backoff
 
 static bool Resolve_Broker (ip_addr_t &Address)
 {
@@ -247,7 +270,7 @@ static void Aux_LED_Task (__unused void *Params)
 
         if (!Resolve_Broker (Broker_Addr))
         {
-            vTaskDelay (pdMS_TO_TICKS (Retry_Period_Ms));
+            Retry_Backoff ();
             continue;
         } // if
         cyw43_arch_lwip_begin ();
@@ -258,13 +281,13 @@ static void Aux_LED_Task (__unused void *Params)
         {
             printf ("Aux LED: mqtt_client_connect failed, err %d\n",
               (int) Err);
-            vTaskDelay (pdMS_TO_TICKS (Retry_Period_Ms));
+            Retry_Backoff ();
             continue;
         } // if
         // Blocks here for as long as the connection stays up; Connection_Cb
         // gives this semaphore on refusal, disconnection or timeout.
         xSemaphoreTake (Disconnect_Semaphore, portMAX_DELAY);
-        vTaskDelay (pdMS_TO_TICKS (Retry_Period_Ms));
+        Retry_Backoff ();
     } // while
 } // Aux_LED_Task
 

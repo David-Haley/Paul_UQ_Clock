@@ -119,7 +119,12 @@ cp build/paul_uq_clock.uf2 /media/$USER/RPI-RP2/
   every other caller just blocks on the event group for the same result.
   Confirmed on hardware: Wi-Fi connect itself intermittently fails outright (the
   full 60s timeout) on this network for reasons unrelated to this code (AP/RF
-  flakiness, not a regression) — a retry (reboot) generally succeeds.
+  flakiness, not a regression) — the driver/async context are only ever set up
+  once (`Init_Driver`), but the join itself (the 60s-timeout call) is retried
+  with exponential backoff (`Connect_Backoff_Initial_Ms` 2s, doubling up to
+  `Connect_Backoff_Max_Ms` 15s) for at least `Connect_Retry_Budget_Ms` (120s)
+  before `Do_Connect` gives up — confirmed on hardware recovering a real join
+  failure on attempt 2.
 - `ntp.hpp` / `ntp.cpp` — the NTP task: calls `WiFi_Connect()` once, then loops
   forever fetching time over a raw UDP SNTP request (not lwIP's bundled `apps/sntp`,
   which owns its own internal resync timer — Instructions.txt wants an explicit
@@ -139,8 +144,14 @@ cp build/paul_uq_clock.uf2 /media/$USER/RPI-RP2/
   API calls (`mqtt_client_connect`, `mqtt_subscribe`) are wrapped in
   `cyw43_arch_lwip_begin()`/`cyw43_arch_lwip_end()`, required for any lwIP raw-API
   call made outside lwIP's own `tcpip_thread` while `LWIP_TCPIP_CORE_LOCKING` is
-  on (`lwipopts.h`). Retries (reconnect, or DNS re-resolve) after a minute on any
-  failure. Incoming publishes are accumulated into a bounded static buffer until
+  on (`lwipopts.h`). Retries (reconnect, or DNS re-resolve) on any failure —
+  DNS failure, a synchronous `mqtt_client_connect` error, or a non-accepted
+  `Connection_Cb` status (refusal, disconnect, timeout) — with exponential
+  backoff from `Mqtt_Retry_Initial_Ms` (2s) up to `Mqtt_Retry_Max_Ms` (60s),
+  resetting back to the initial delay once a connection is actually accepted;
+  confirmed on hardware both recovering a real `ERR_RTE` and backing off
+  correctly (2s/4s/8s/16s...) against a host with no listener. Incoming
+  publishes are accumulated into a bounded static buffer until
   the final fragment, then parsed as JSON with a vendored copy of **cJSON**
   (`cJSON.c`/`cJSON.h`, upstream `DaveGamble/cJSON` v1.7.19 — chosen over a
   hand-rolled parser) per `aux_led.json schema` (see

@@ -1,5 +1,0 @@
-New feature is to be to set the colour of Addressable_LED Leds with indices 12 to 18 inclusive. LEDs may also flash at a 1Hz rate.
-Clock_Set is now called at 2Hz rate and Flasher is inverter on each call. When Flasher is true set the LED to the specified colour, Flasher false set LED to black.
-Colours are defined in Colour_Table, individual LEDs are set by calling Set_One.
-Colour information is to be obtained from from MQTT Broker, User, Topic and Passwordspecified in configuration.h file.
-The colour information is passed as a JSON object specified by aux_led.json_schema. An example JSON object Test_1.json is in directory Aux_LED_Examples. 
