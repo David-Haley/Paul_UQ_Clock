@@ -4,6 +4,10 @@
 
 #include <stdio.h>
 
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "event_groups.h"
+
 #include "pico/cyw43_arch.h"
 #include "pico/async_context_freertos.h"
 
@@ -11,6 +15,16 @@
 #include "configuration.h"
 
 const uint32_t Connect_Timeout_Ms = 60000;
+
+const EventBits_t Wifi_Connected_Bit = 1 << 0;
+const EventBits_t Wifi_Failed_Bit = 1 << 1;
+
+// Guards Started below, so that when ntp.cpp's task and aux_led.cpp's task
+// both call WiFi_Connect at startup, exactly one of them does the actual
+// connect and the other just waits for the result (see Wifi_Event_Group).
+static SemaphoreHandle_t Start_Mutex = NULL;
+static EventGroupHandle_t Wifi_Event_Group = NULL;
+static bool Started = false;
 
 // The cyw43 driver's own async_context worker task and lwIP's tcpip_thread (which
 // it creates internally) are not pinned to a particular core: pinning the former
@@ -20,7 +34,13 @@ const uint32_t Connect_Timeout_Ms = 60000;
 // task in this project. See CLAUDE.md.
 static async_context_freertos_t Async_Context;
 
-bool WiFi_Connect (void)
+void WiFi_Init (void)
+{
+    Start_Mutex = xSemaphoreCreateMutex ();
+    Wifi_Event_Group = xEventGroupCreate ();
+} // WiFi_Init
+
+static bool Do_Connect (void)
 {
     async_context_freertos_config_t Config =
       async_context_freertos_default_config ();
@@ -47,4 +67,22 @@ bool WiFi_Connect (void)
     } // if
     printf ("Wi-Fi: connected\n");
     return true;
+} // Do_Connect
+
+bool WiFi_Connect (void)
+{
+    xSemaphoreTake (Start_Mutex, portMAX_DELAY);
+    if (!Started)
+    {
+        Started = true;
+        xSemaphoreGive (Start_Mutex);
+        bool Success = Do_Connect ();
+        xEventGroupSetBits (Wifi_Event_Group,
+          Success ? Wifi_Connected_Bit : Wifi_Failed_Bit);
+        return Success;
+    } // if
+    xSemaphoreGive (Start_Mutex);
+    EventBits_t Bits = xEventGroupWaitBits (Wifi_Event_Group,
+      Wifi_Connected_Bit | Wifi_Failed_Bit, pdFALSE, pdFALSE, portMAX_DELAY);
+    return (Bits & Wifi_Connected_Bit) != 0;
 } // WiFi_Connect
