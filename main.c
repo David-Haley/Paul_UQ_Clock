@@ -21,6 +21,7 @@
 #include "ntp.hpp"
 #include "aux_led.hpp"
 #include "cpu_load.hpp"
+#include "veml7700.hpp"
 #include "hardware/rtc.h"
 #include "pico/util/datetime.h"
 
@@ -40,6 +41,9 @@ static void led_task(__unused void *params) {
 
 static void heartbeat_task(__unused void *params) {
     datetime_t Time;
+    uint16_t Raw_ALS;
+
+    VEML7700_Init();
 
     // RTC_Mutex is created by Clock_Init (called from led_task). Safe without
     // waiting for it here: led_task has higher priority and both tasks are
@@ -49,8 +53,13 @@ static void heartbeat_task(__unused void *params) {
         xSemaphoreTake(RTC_Mutex, portMAX_DELAY);
         rtc_get_datetime(&Time);
         xSemaphoreGive(RTC_Mutex);
-        printf("%04d-%02d-%02d %02d:%02d:%02d\n", Time.year, Time.month,
-          Time.day, Time.hour, Time.min, Time.sec);
+        if (VEML7700_Read_ALS(&Raw_ALS)) {
+            printf("%04d-%02d-%02d %02d:%02d:%02d %u\n", Time.year, Time.month,
+              Time.day, Time.hour, Time.min, Time.sec, Raw_ALS);
+        } else {
+            printf("%04d-%02d-%02d %02d:%02d:%02d No VELM7700\n", Time.year, Time.month,
+              Time.day, Time.hour, Time.min, Time.sec);
+        }
         vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_DELAY_MS));
     }
 }

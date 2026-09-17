@@ -21,7 +21,8 @@ target_sources(paul_uq_clock PRIVATE
     ntp.cpp
     aux_led.cpp
     cJSON.c
-    cpu_load.cpp)
+    cpu_load.cpp
+    veml7700.cpp)
 
 target_include_directories(paul_uq_clock PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
@@ -34,6 +35,7 @@ target_link_libraries(paul_uq_clock
     hardware_pio
     hardware_dma
     hardware_rtc
+    hardware_i2c
     FreeRTOS-Kernel-Heap4
     /home/david/Pico_Projects/LED_Driver/build/libaddressable_led.a)
 
