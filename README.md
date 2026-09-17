@@ -1,6 +1,6 @@
 # Paul_UQ_Clock
 
-A 12-LED analog-style clock for the Raspberry Pi Pico W, built on FreeRTOS. Hour, minute, and second are each shown as a coloured marker on a 12-position addressable LED ring, with a separate LED indicating AM/PM, plus 7 auxiliary LEDs that can be set (and optionally flashed) over MQTT.
+A 12-LED analog-style clock for the Raspberry Pi Pico W, built on FreeRTOS. Hour, minute, and second are each shown as a coloured marker on a 12-position addressable LED ring, with a separate LED indicating AM/PM, plus 7 auxiliary LEDs that can be set (and optionally flashed) over MQTT. Overall brightness is set automatically from an ambient light sensor.
 
 ## Hardware
 
@@ -9,6 +9,7 @@ A 12-LED analog-style clock for the Raspberry Pi Pico W, built on FreeRTOS. Hour
   - LEDs 0-11 form the 12-position clock face
   - LEDs 12-18 are auxiliary LEDs, set from JSON delivered over MQTT
   - LED 19 is the AM/PM indicator
+- A VEML7700 ambient light sensor on I2C0 (GP0 = SDA, GP1 = SCL, physical pins 1/2), at its default I2C address
 
 ## Display
 
@@ -23,6 +24,16 @@ Each second, `Clock_Set` (in `clock.cpp`) reads the RP2040's onboard RTC and lig
 - **White** — hour, minute, and second markers all coincide
 
 Since each LED can only show one colour at a time, collisions between markers are shown as a distinct blended colour rather than silently overwriting one another.
+
+## Automatic brightness
+
+Once a second, `heartbeat_task` reads the VEML7700 over I2C0 and prints the raw
+ambient light (ALS) count alongside the date/time on USB stdio — or `No VELM7700`
+if the sensor isn't detected. On a successful reading, the raw count is
+log2-scaled — normalized against the sensor's full 16-bit range — into a
+brightness from 2 (dimmest) to 255 (brightest, unscaled), which is then applied
+to every LED (clock face, AM/PM, and all 7 auxiliary LEDs) on the next display
+update. A failed reading leaves brightness at whatever it was last set to.
 
 ## Time sync
 

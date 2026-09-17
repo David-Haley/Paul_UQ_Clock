@@ -27,6 +27,14 @@ void VEML7700_Init (void);
 // power-on write in that case, so the sensor self-heals if plugged in later.
 bool VEML7700_Read_ALS (uint16_t *Raw_ALS);
 
+// Converts a raw ALS reading (as returned by VEML7700_Read_ALS) to a
+// Set_One Brightness value (2 = dimmest, 255 = brightest) using log2
+// scaling of the raw count against the sensor's full 16-bit range, so
+// perceptual brightness maps linearly onto Set_One's 2..255 range. Raw_ALS
+// = 0 is treated as 1 (log2 is undefined at 0) and maps to Brightness 2.
+// Pure, no I2C access -- safe to call from any task.
+unsigned char VEML7700_Raw_To_Brightness (uint16_t Raw_ALS);
+
 #ifdef __cplusplus
 }
 #endif

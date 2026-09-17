@@ -2,6 +2,7 @@
 // Author : David Haley
 
 #include <stdio.h>
+#include <math.h>
 
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
@@ -21,6 +22,12 @@ const uint VEML7700_Timeout_Us = 10000; // per I2C transaction; a NACK (no
   // 1000 ms heartbeat period.
 const uint32_t VEML7700_Power_On_Settle_Us = 2500; // datasheet settle time
   // after ALS_SD is cleared, before the first ALS reading is valid.
+const uint16_t VEML7700_Raw_ALS_Max = 65535; // full 16-bit ALS register
+  // range; Brightness scaling normalizes log2(Raw_ALS) against log2 of this.
+const unsigned char VEML7700_Brightness_Min = 2; // matches
+  // Addressable_LED::Set_One's dimmest non-zero Brightness.
+const unsigned char VEML7700_Brightness_Max = 255; // matches
+  // Addressable_LED::Set_One's unscaled Brightness.
 
 static bool Device_Present = false;
 
@@ -86,3 +93,20 @@ bool VEML7700_Read_ALS (uint16_t *Raw_ALS)
     *Raw_ALS = (uint16_t) Data [0] | ((uint16_t) Data [1] << 8); // LSB first
     return true;
 } // VEML7700_Read_ALS
+
+unsigned char VEML7700_Raw_To_Brightness (uint16_t Raw_ALS)
+{
+    float Clamped_Raw = Raw_ALS < 1 ? 1.0f : (float) Raw_ALS;
+    float Ratio = log2f (Clamped_Raw) / log2f ((float) VEML7700_Raw_ALS_Max);
+    float Brightness = (float) VEML7700_Brightness_Min + Ratio *
+      (float) (VEML7700_Brightness_Max - VEML7700_Brightness_Min);
+    if (Brightness < (float) VEML7700_Brightness_Min)
+    {
+        Brightness = (float) VEML7700_Brightness_Min;
+    } // if
+    else if (Brightness > (float) VEML7700_Brightness_Max)
+    {
+        Brightness = (float) VEML7700_Brightness_Max;
+    } // if
+    return (unsigned char) (Brightness + 0.5f); // round to nearest
+} // VEML7700_Raw_To_Brightness

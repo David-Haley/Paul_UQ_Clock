@@ -54,6 +54,7 @@ static void heartbeat_task(__unused void *params) {
         rtc_get_datetime(&Time);
         xSemaphoreGive(RTC_Mutex);
         if (VEML7700_Read_ALS(&Raw_ALS)) {
+            Clock_Set_Brightness(VEML7700_Raw_To_Brightness(Raw_ALS));
             printf("%04d-%02d-%02d %02d:%02d:%02d %u\n", Time.year, Time.month,
               Time.day, Time.hour, Time.min, Time.sec, Raw_ALS);
         } else {

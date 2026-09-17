@@ -29,6 +29,13 @@ extern SemaphoreHandle_t RTC_Mutex;
 // Clock_Set reads it every call.
 extern SemaphoreHandle_t Aux_LED_Mutex;
 
+// Guards Current_Brightness (clock.cpp) -- the LED Brightness (2..255, per
+// Addressable_LED::Set_One) derived from the VEML7700 ambient light sensor.
+// Shared with main.c's heartbeat_task, which writes it via
+// Clock_Set_Brightness once per successful VEML7700_Read_ALS; Clock_Set
+// reads it under this mutex once per call.
+extern SemaphoreHandle_t Brightness_Mutex;
+
 void Clock_Init (void);
 
 void Clock_Set (void);
@@ -40,6 +47,12 @@ void Clock_Set (void);
 // Aux_LED_First .. Aux_LED_Last.
 void Clock_Set_Aux_LEDs (const uint32_t Colour [Aux_LED_Count],
   const bool Flash [Aux_LED_Count]);
+
+// Sets the LED Brightness (2 = dimmest, 255 = brightest) used by every
+// Set_One call in Clock_Set, in one atomic step under Brightness_Mutex.
+// Called by main.c's heartbeat_task after each successful
+// VEML7700_Read_ALS; a failed read leaves the last-set Brightness in effect.
+void Clock_Set_Brightness (unsigned char Brightness);
 
 #ifdef __cplusplus
 }
