@@ -1,0 +1,12 @@
+{
+   "aux_led" : 
+   [
+      {"led" : 17, "colour" : "red"},
+      {"led" : 16, "colour" : "yellow", "flash" : true},
+      {"led" : 15, "colour" : "green"},
+      {"led" : 14, "colour" : "cyan", "flash" : true},
+      {"led" : 13, "colour" : "blue"},
+      {"led" : 12, "colour" : "magenta", "flash" : true},
+      {"led" : 18, "colour" : "green"}
+   ]
+}
